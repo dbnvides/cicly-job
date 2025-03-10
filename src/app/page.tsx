@@ -1,45 +1,129 @@
 'use client'
 
+import { useState } from "react";
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from "react-icons/fi";
 import { format } from "date-fns";
-import { useEffect, useState } from "react";
-import { FiPlus, FiEdit2, FiTrash2, FiSearch} from "react-icons/fi";
-import { FiX } from "react-icons/fi";
+import { Method, Status } from "@prisma/client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from 'react-hook-form';
+
+
+interface Job {
+  id: number;
+  company: string;
+  position: string;
+  date: string;
+  method: Method;
+  status: Status;
+  usuarioId: number;
+  link: string;
+}
 
 export default function Home() {
-  const [jobs, setJobs] = useState(() => {
-    const savedJobs = localStorage.getItem("jobs");
-    return savedJobs ? JSON.parse(savedJobs) : [];
-  });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingJob, setEditingJob] = useState(null);
-  const [formData, setFormData] = useState({
-    companyName: "",
-    position: "",
-    applicationDate: format(new Date(), "yyyy-MM-dd"),
-    applicationMethod: "Online",
-    status: "Applied"
+  const queryClient = useQueryClient();
+
+  const { data: jobs, error, isLoading } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: async () => {
+      const res = await fetch(`/api/job/1`);
+      if (!res.ok) throw new Error("Erro ao buscar jobs");
+      return res.json();
+    }
+  });
+
+  const usuarioId = 1
+
+  const deleteJobMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/job/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    }
+  });
+
+  const addJobMutation = useMutation({
+    mutationFn: async (newJob: { company: string; position: string; date: string; method: Method; status: Status, link: string }) => {
+      const response = await fetch('/api/job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newJob)
+      });
+      if (!response.ok) {
+        throw new Error('Erro ao adicionar o job');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+    onError: (error) => {
+      console.log('Erro:', error);
+    }
+  });
+
+  const editJobMutation = useMutation({
+    mutationFn: async (newJob: { id: number; company?: string; position?: string; date?: string; method?: Method; status?: Status, link?:string }) => {
+      const response = await fetch(`/api/job/${editingJob!.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newJob)
+      });
+      if (!response.ok) {
+        throw new Error('Erro ao adicionar o job');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+    onError: (error) => {
+      console.log('Erro:', error);
+    }
   });
   
-  const handleEdit = (job) => {
+  
+  const { register, handleSubmit, formState: { errors }, reset } = useForm();
+
+  const onSubmit = (data: { position: string; date: string; method: Method; status: Status; link:string }) => {
+    
+    
+    if(editingJob){
+      const id = editingJob!.id
+      editJobMutation.mutate({...data, usuarioId, id})
+      reset();
+      setIsModalOpen(false);
+      return
+    }
+
+    addJobMutation.mutate({ ...data, usuarioId });
+    reset();
+    setIsModalOpen(false);
+  };
+  
+  const handleDelete = (id: number) => {
+    deleteJobMutation.mutate(id);
+  };
+
+  const handleEdit = (job: Job) => {
     setEditingJob(job);
-    setFormData({ ...job });
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
-  const updatedJobs = jobs.filter(job => job.id !== id);
-  setJobs(updatedJobs);
-  localStorage.setItem("jobs", JSON.stringify(updatedJobs));
-};
-
-  const filteredJobs = jobs.filter(job =>
-    job.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredJobs = jobs?.filter(job =>
+    job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.position.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const StatusBadge = ({ status }) => {
-    const getStatusColor = (status) => {
+  const StatusBadge = ({ status }: { status: Status }) => {
+    const getStatusColor = (status: Status) => {
       const colors = {
         Applied: "bg-blue-100 text-blue-800",
         Interviewing: "bg-yellow-100 text-yellow-800",
@@ -56,124 +140,100 @@ export default function Home() {
     );
   };
 
-  useEffect(() => {
-    if (jobs.length > 0) {
-      localStorage.setItem("jobs", JSON.stringify(jobs));
-    }
-  }, [jobs]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingJob) {
-      setJobs(jobs.map(job => job.id === editingJob.id ? { ...formData, id: editingJob.id } : job));
-    } else {
-      setJobs([...jobs, { ...formData, id: Date.now() }]);
-    }
-    setIsModalOpen(false);
-    resetForm();
+  const formatarDataBR = (dataISO: string) => {
+    const [year, month, day] = dataISO.split("-");
+    return `${day}/${month}/${year}`;
   };
-
-  const resetForm = () => {
-      setFormData({
-      companyName: "",
-      position: "",
-      applicationDate: format(new Date(), "yyyy-MM-dd"),
-      applicationMethod: "Online",
-      status: "Applied"
-      });
-  setEditingJob(null);
-  };
-
+ 
   return (
-   <div className="min-h-screen bg-gray-50"> 
-   
-    <header className="bg-white shadow-sm">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Cicly Jobs</h1>
-          <div className="flex space-x-4">
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Cicly Jobs</h1>
+            <div className="flex space-x-4">
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
                 aria-label="Add new job application"
               >
-                <FiPlus className="inline mr-2" />Add Job
+                <FiPlus className="inline mr-2" /> Add Job
               </button>
-              <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">
-                Sign In
-              </button>
+            </div>
           </div>
+        </nav>
+      </header>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6 relative">
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search jobs..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-      </nav>
-    </header>
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6 relative">
-        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search jobs..."
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
 
-      <section className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredJobs.map((job) => (
-              <tr key={job.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{job.companyName}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{job.position}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{job.applicationDate}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{job.applicationMethod}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge status={job.status} />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <button
-                    onClick={() => handleEdit(job)}
-                    className="text-blue-600 hover:text-blue-900 mr-3"
-                    aria-label="Edit job application"
-                  >
-                    <FiEdit2 className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(job.id)}
-                    className="text-red-600 hover:text-red-900"
-                    aria-label="Delete job application"
-                  >
-                    <FiTrash2 className="h-5 w-5" />
-                  </button>
-                </td>
+        <section className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
-              ))}
-          </tbody>
-        </table>
+            </thead>
 
-       
-      </section>
-    </main>
-    {isModalOpen && 
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4">
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredJobs?.map((job: Job) => (
+                <tr key={job.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">{job.company}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{job.position}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{formatarDataBR(job.date)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{job.method}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <StatusBadge status={job.status} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap"><a href={job.link} target="_blank" className="underline text-blue-700">Link</a></td>
+                  
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleEdit(job)}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                      aria-label="Edit job application"
+                    >
+                      <FiEdit2 className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(job.id)}
+                      className="text-red-600 hover:text-red-900"
+                      aria-label="Delete job application"
+                    >
+                      <FiTrash2 className="h-5 w-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </main>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">{editingJob ? "Edit Job Application" : "Add New Job Application"}</h2>
+              <h2 className="text-xl font-semibold">{editingJob ? "Atualização da vaga" : "Nova vaga aplicada"}</h2>
               <button
                 onClick={() => {
                   setIsModalOpen(false);
-                  resetForm();
+                  setEditingJob(null);
+                  reset();
                 }}
                 className="text-gray-400 hover:text-gray-500"
                 aria-label="Close modal"
@@ -181,75 +241,96 @@ export default function Home() {
                 <FiX className="h-6 w-6" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">Company Name</label>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <fieldset>
+                <label htmlFor="company" className="block text-sm font-medium text-gray-700">Empresa</label>
                 <input
+                  {...register("company", { required: "Company name is required" })}
+                  id="company"
                   type="text"
-                  id="companyName"
-                  required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value={formData.companyName}
-                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                  defaultValue={editingJob?.company || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              <div>
-                <label htmlFor="position" className="block text-sm font-medium text-gray-700">Position</label>
+                {errors.company && <p className="text-red-500 text-xs">{errors.company.message}</p>}
+              </fieldset>
+
+              <fieldset>
+                <label htmlFor="position" className="block text-sm font-medium text-gray-700">Posição</label>
                 <input
-                  type="text"
+                  {...register("position", { required: "Position is required" })}
                   id="position"
-                  required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  type="text"
+                  defaultValue={editingJob?.position || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              <div>
-                <label htmlFor="applicationDate" className="block text-sm font-medium text-gray-700">Application Date</label>
+                {errors.position && <p className="text-red-500 text-xs">{errors.position.message}</p>}
+              </fieldset>
+
+              <fieldset>
+                <label htmlFor="date" className="block text-sm font-medium text-gray-700">Data</label>
                 <input
+                  {...register("date", { required: "Date is required" })}
+                  id="date"
                   type="date"
-                  id="applicationDate"
-                  required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value={formData.applicationDate}
-                  onChange={(e) => setFormData({ ...formData, applicationDate: e.target.value })}
+                  defaultValue={editingJob?.date || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              <div>
-                <label htmlFor="applicationMethod" className="block text-sm font-medium text-gray-700">Application Method</label>
+                {errors.date && <p className="text-red-500 text-xs">{errors.date.message}</p>}
+              </fieldset>
+
+              <fieldset>
+                <label htmlFor="method" className="block text-sm font-medium text-gray-700">Metodo de aplicação</label>
                 <select
-                  id="applicationMethod"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value={formData.applicationMethod}
-                  onChange={(e) => setFormData({ ...formData, applicationMethod: e.target.value })}
+                  {...register("method", { required: "Method is required" })}
+                  id="method"
+                  defaultValue={editingJob?.method || 'EMAIL'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
-                  <option>Online</option>
-                  <option>Email</option>
-                  <option>Referral</option>
+                  <option value="EMAIL">Email</option>
+                  <option value="ONLINE">Online</option>
+                  <option value="REFERRAL">Indicado</option>
                 </select>
-              </div>
-              <div>
+                {errors.method && <p className="text-red-500 text-xs">{errors.method.message}</p>}
+              </fieldset>
+
+              <fieldset>
                 <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
                 <select
+                  {...register("status", { required: "Status is required" })}
                   id="status"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  defaultValue={editingJob?.status || 'APPLIED'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
-                  <option>Applied</option>
-                  <option>Interviewing</option>
-                  <option>Rejected</option>
-                  <option>Offered</option>
+                  <option value="APPLIED">Aplicado</option>
+                  <option value="INTERVIEWING">Entrevistando</option>
+                  <option value="REJECTED">Rejeitado</option>
+                  <option value="OFFERED">Proposta oferecida</option>
                 </select>
-              </div>
-              <div className="flex justify-end space-x-3 pt-4">
+                {errors.status && <p className="text-red-500 text-xs">{errors.status.message}</p>}
+              </fieldset>
+
+              <fieldset>
+                <label htmlFor="link" className="block text-sm font-medium text-gray-700">Link</label>
+                <input
+                  {...register("link", { required: "link is required" })}
+                  id="link"
+                  type="text"
+                  defaultValue={editingJob?.link || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.link && <p className="text-red-500 text-xs">{errors.link.message}</p>}
+              </fieldset>
+
+              <div className="mt-4 flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setIsModalOpen(false);
-                    resetForm();
+                    setEditingJob(null);
+                    reset();
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
                 >
                   Cancel
                 </button>
@@ -257,13 +338,14 @@ export default function Home() {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  {editingJob ? "Update" : "Add"} Job
+                  Save
                 </button>
               </div>
             </form>
           </div>
-      </div>}
-   </div>
-   
+        </div>
+        
+      )}
+    </div>
   );
 }

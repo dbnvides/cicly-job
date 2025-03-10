@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "@/hook/hashpassword";
 
 const prisma = new PrismaClient();
 
@@ -28,11 +29,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const newUser = await prisma.usuario.create({
-      data: { nome, email, password },
+    const hashedPassword = await hashPassword(password);
+
+    await prisma.usuario.create({
+      data: { nome, email, password: hashedPassword },
     });
 
-    return NextResponse.json(newUser, { status: 201 });
+    return NextResponse.json({ nome, email }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: "Erro ao criar usuário" },

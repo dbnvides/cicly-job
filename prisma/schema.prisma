@@ -27,18 +27,22 @@ enum Status {
 }
 
 model Usuario {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   nome      String
-  email     String   @unique
+  email     String     @unique
   password  String
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
+  jobs      Jobapply[]
 }
 
 model Jobapply {
-  id       Int      @id @default(autoincrement())
-  company  String
-  position String
-  date     DateTime
-  method   Method   @default(ONLINE)
-  status   Status   @default(APPLIED)
+  id        Int      @id @default(autoincrement())
+  company   String
+  position  String
+  date      String
+  link      String
+  method    Method   @default(ONLINE)
+  status    Status   @default(APPLIED)
+  Usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+  usuarioId Int?
 }
