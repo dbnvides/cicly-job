@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const usuarios = await prisma.usuario.findMany();
     return NextResponse.json(usuarios, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Erro ao buscar usuários" },
       { status: 500 }
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ nome, email }, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Erro ao criar usuário" },
       { status: 500 }

@@ -1,12 +1,12 @@
-import { PrismaClient, Method, Status } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import { Method, Status } from "@/types/prisma";
 import { NextResponse } from "next/server";
-// import { NextApiRequest, NextApiResponse } from "next";
 
 const prisma = new PrismaClient();
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
@@ -23,8 +23,8 @@ export async function GET(
     });
 
     return NextResponse.json(jobs ?? [], { status: 200 });
-  } catch (error) {
-    console.error("Erro ao buscar vagas:", error);
+  } catch {
+    console.error("Erro ao buscar vagas");
     return NextResponse.json(
       { error: "Erro ao buscar vagas" },
       { status: 500 }
@@ -70,7 +70,7 @@ export async function PATCH(req: Request) {
     });
 
     return NextResponse.json(updatedJob, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Erro ao atualizar a vaga" },
       { status: 500 }
@@ -80,7 +80,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
@@ -99,7 +99,7 @@ export async function DELETE(
       { message: "Registro deletado com sucesso!" },
       { status: 200 }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Erro ao deletar a aplicação de emprego." },
       { status: 500 }

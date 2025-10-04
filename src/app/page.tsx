@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from "react-icons/fi";
-import { format } from "date-fns";
-import { Method, Status } from "@prisma/client";
+import { Method, Status } from "@/types/prisma";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from 'react-hook-form';
 
@@ -19,13 +18,22 @@ interface Job {
   link: string;
 }
 
+interface JobFormData {
+  company: string;
+  position: string;
+  date: string;
+  method: Method;
+  status: Status;
+  link: string;
+}
+
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: jobs, error, isLoading } = useQuery({
+  const { data: jobs } = useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
       const res = await fetch(`/api/job/1`);
@@ -46,7 +54,7 @@ export default function Home() {
   });
 
   const addJobMutation = useMutation({
-    mutationFn: async (newJob: { company: string; position: string; date: string; method: Method; status: Status, link: string }) => {
+    mutationFn: async (newJob: JobFormData & { usuarioId: number }) => {
       const response = await fetch('/api/job', {
         method: 'POST',
         headers: {
@@ -68,7 +76,7 @@ export default function Home() {
   });
 
   const editJobMutation = useMutation({
-    mutationFn: async (newJob: { id: number; company?: string; position?: string; date?: string; method?: Method; status?: Status, link?:string }) => {
+    mutationFn: async (newJob: Partial<JobFormData> & { id: number; usuarioId?: number }) => {
       const response = await fetch(`/api/job/${editingJob!.id}`, {
         method: 'PATCH',
         headers: {
@@ -90,9 +98,9 @@ export default function Home() {
   });
   
   
-  const { register, handleSubmit, formState: { errors }, reset } = useForm();
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<JobFormData>();
 
-  const onSubmit = (data: { position: string; date: string; method: Method; status: Status; link:string }) => {
+  const onSubmit = (data: JobFormData) => {
     
     
     if(editingJob){
@@ -117,20 +125,20 @@ export default function Home() {
     setIsModalOpen(true);
   };
 
-  const filteredJobs = jobs?.filter(job =>
+  const filteredJobs = jobs?.filter((job: Job) =>
     job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.position.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const StatusBadge = ({ status }: { status: Status }) => {
     const getStatusColor = (status: Status) => {
-      const colors = {
-        Applied: "bg-blue-100 text-blue-800",
-        Interviewing: "bg-yellow-100 text-yellow-800",
-        Rejected: "bg-red-100 text-red-800",
-        Offered: "bg-green-100 text-green-800"
+      const colors: Record<Status, string> = {
+        [Status.APPLIED]: "bg-blue-100 text-blue-800",
+        [Status.INTERVIEWING]: "bg-yellow-100 text-yellow-800",
+        [Status.REJECTED]: "bg-red-100 text-red-800",
+        [Status.OFFERED]: "bg-green-100 text-green-800"
       };
-      return colors[status] || colors.Applied;
+      return colors[status] || colors[Status.APPLIED];
     };
 
     return (
@@ -252,7 +260,7 @@ export default function Home() {
                   defaultValue={editingJob?.company || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.company && <p className="text-red-500 text-xs">{errors.company.message}</p>}
+                {errors.company && <p className="text-red-500 text-xs">{String(errors.company.message)}</p>}
               </fieldset>
 
               <fieldset>
@@ -264,7 +272,7 @@ export default function Home() {
                   defaultValue={editingJob?.position || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.position && <p className="text-red-500 text-xs">{errors.position.message}</p>}
+                {errors.position && <p className="text-red-500 text-xs">{String(errors.position.message)}</p>}
               </fieldset>
 
               <fieldset>
@@ -276,7 +284,7 @@ export default function Home() {
                   defaultValue={editingJob?.date || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.date && <p className="text-red-500 text-xs">{errors.date.message}</p>}
+                {errors.date && <p className="text-red-500 text-xs">{String(errors.date.message)}</p>}
               </fieldset>
 
               <fieldset>
@@ -291,7 +299,7 @@ export default function Home() {
                   <option value="ONLINE">Online</option>
                   <option value="REFERRAL">Indicado</option>
                 </select>
-                {errors.method && <p className="text-red-500 text-xs">{errors.method.message}</p>}
+                {errors.method && <p className="text-red-500 text-xs">{String(errors.method.message)}</p>}
               </fieldset>
 
               <fieldset>
@@ -307,7 +315,7 @@ export default function Home() {
                   <option value="REJECTED">Rejeitado</option>
                   <option value="OFFERED">Proposta oferecida</option>
                 </select>
-                {errors.status && <p className="text-red-500 text-xs">{errors.status.message}</p>}
+                {errors.status && <p className="text-red-500 text-xs">{String(errors.status.message)}</p>}
               </fieldset>
 
               <fieldset>
@@ -319,7 +327,7 @@ export default function Home() {
                   defaultValue={editingJob?.link || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.link && <p className="text-red-500 text-xs">{errors.link.message}</p>}
+                {errors.link && <p className="text-red-500 text-xs">{String(errors.link.message)}</p>}
               </fieldset>
 
               <div className="mt-4 flex justify-end space-x-3">
