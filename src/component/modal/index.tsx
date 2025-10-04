@@ -1,14 +1,39 @@
 import { useForm } from "react-hook-form";
 import { FiX } from "react-icons/fi";
 
-export default function JobModal({ userId, editingJob, setEditingJob ,setIsModalOpen }) {
-    const { register, handleSubmit, formState: { errors }, reset } = useForm();
+interface Job {
+  id: number;
+  company: string;
+  position: string;
+  date: string;
+  method: string;
+  status: string;
+  link: string;
+}
+
+interface JobModalProps {
+  userId: number;
+  editingJob: Job | null;
+  setEditingJob: (job: Job | null) => void;
+  setIsModalOpen: (open: boolean) => void;
+}
+
+interface FormData {
+  company: string;
+  position: string;
+  date: string;
+  method: string;
+  status: string;
+}
+
+export default function JobModal({ userId, editingJob, setEditingJob, setIsModalOpen }: JobModalProps) {
+    const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>();
     
-    const onSubmit = (data) => {
-      const jobData = {
+    const onSubmit = (data: FormData) => {
+      console.log({
         ...data,
-        userId, // Adiciona o userId ao enviar os dados
-      };
+        userId,
+      });
   
       // Aqui você faria a chamada para o servidor para adicionar ou editar o job
       if (editingJob) {
@@ -51,7 +76,7 @@ export default function JobModal({ userId, editingJob, setEditingJob ,setIsModal
                   defaultValue={editingJob?.company || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.company && <p className="text-red-500 text-xs">{errors.company.message}</p>}
+                {errors.company && <p className="text-red-500 text-xs">{String(errors.company.message)}</p>}
               </div>
 
               <div>
@@ -63,7 +88,7 @@ export default function JobModal({ userId, editingJob, setEditingJob ,setIsModal
                   defaultValue={editingJob?.position || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.position && <p className="text-red-500 text-xs">{errors.position.message}</p>}
+                {errors.position && <p className="text-red-500 text-xs">{String(errors.position.message)}</p>}
               </div>
 
               <div>
@@ -75,7 +100,7 @@ export default function JobModal({ userId, editingJob, setEditingJob ,setIsModal
                   defaultValue={editingJob?.date || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.date && <p className="text-red-500 text-xs">{errors.date.message}</p>}
+                {errors.date && <p className="text-red-500 text-xs">{String(errors.date.message)}</p>}
               </div>
 
               <div>
@@ -90,7 +115,7 @@ export default function JobModal({ userId, editingJob, setEditingJob ,setIsModal
                   <option value="In-person">In-person</option>
                   <option value="Referral">Referral</option>
                 </select>
-                {errors.method && <p className="text-red-500 text-xs">{errors.method.message}</p>}
+                {errors.method && <p className="text-red-500 text-xs">{String(errors.method.message)}</p>}
               </div>
 
               <div>
@@ -105,7 +130,7 @@ export default function JobModal({ userId, editingJob, setEditingJob ,setIsModal
                   <option value="Rejected">Rejected</option>
                   <option value="Offered">Offered</option>
                 </select>
-                {errors.status && <p className="text-red-500 text-xs">{errors.status.message}</p>}
+                {errors.status && <p className="text-red-500 text-xs">{String(errors.status.message)}</p>}
               </div>
 
               <div className="mt-4 flex justify-end space-x-3">

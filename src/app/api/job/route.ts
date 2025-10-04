@@ -1,6 +1,6 @@
-import { PrismaClient, Method, Status } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import { Method, Status } from "@/types/prisma";
 import { NextResponse } from "next/server";
-// import { NextApiRequest, NextApiResponse } from "next";
 
 const prisma = new PrismaClient();
 
@@ -60,13 +60,13 @@ export async function POST(req: Request) {
           link,
         },
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error("Erro no Prisma:", err);
         throw err;
       });
     return NextResponse.json(newJob, { status: 201 });
-  } catch (error) {
-    console.error("Erro ao adicionar vaga:", error);
+  } catch {
+    console.error("Erro ao adicionar vaga");
     return NextResponse.json(
       { error: "Erro ao adicionar vaga" },
       { status: 500 }
